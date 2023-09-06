@@ -129,7 +129,7 @@ export default class Object3D extends Listenable {
 	 */
 	set origin(v3) {
 		this._origin.copy(v3);
-		this._invalidateModel();
+		this._invalidateLocalModel();
 		this.notify('origin', this._origin);
 	}
 
@@ -149,7 +149,7 @@ export default class Object3D extends Listenable {
 	 */
 	set orientation(q) {
 		this._orientation.copy(q);
-		this._invalidateModel();
+		this._invalidateLocalModel();
 		this.notify('orientation', this._orientation);
 	}
 
@@ -169,7 +169,7 @@ export default class Object3D extends Listenable {
 	 */
 	set size(v3) {
 		this._scale.copy(v3);
-		this._invalidateModel();
+		this._invalidateLocalModel();
 		this.notify('size', this._scale);
 	}
 
@@ -275,7 +275,7 @@ export default class Object3D extends Listenable {
 	 */
 	scale(v) {
 		this._scale.multiply(v);
-		this._invalidateModel();
+		this._invalidateLocalModel();
 		this.notify('size', this._scale);
 	}
 
@@ -286,7 +286,7 @@ export default class Object3D extends Listenable {
 	 */
 	translate(v) {
 		this._origin.add(v);
-		this._invalidateModel();
+		this._invalidateLocalModel();
 		this.notify('origin', this._origin);
 	}
 
@@ -297,7 +297,7 @@ export default class Object3D extends Listenable {
 	 */
 	translateX(delta_x) {
 		this._origin.translateX(delta_x);
-		this._invalidateModel();
+		this._invalidateLocalModel();
 		this.notify('origin', this._origin);
 	}
 
@@ -308,7 +308,7 @@ export default class Object3D extends Listenable {
 	 */
 	translateY(delta_y) {
 		this._origin.translateY(delta_y);
-		this._invalidateModel();
+		this._invalidateLocalModel();
 		this.notify('origin', this._origin);
 	}
 
@@ -319,7 +319,7 @@ export default class Object3D extends Listenable {
 	 */
 	translateZ(delta_z) {
 		this._origin.translateZ(delta_z);
-		this._invalidateModel();
+		this._invalidateLocalModel();
 		this.notify('origin', this._origin);
 	}
 
@@ -333,7 +333,7 @@ export default class Object3D extends Listenable {
 	rotate(theta, axis) {
 		this._tmp_quaternion.fromAxisRotation(theta, axis);
 		this._orientation.multiply(this._tmp_quaternion);
-		this._invalidateModel();
+		this._invalidateLocalModel();
 		this.notify('orientation', this._orientation);
 	}
 
@@ -345,7 +345,7 @@ export default class Object3D extends Listenable {
 	rotateX(theta) {
 		this._tmp_quaternion.fromAxisRotation(theta, Vec3.X_AXIS);
 		this._orientation.multiply(this._tmp_quaternion);
-		this._invalidateModel();
+		this._invalidateLocalModel();
 		this.notify('orientation', this._orientation);
 	}
 
@@ -357,7 +357,8 @@ export default class Object3D extends Listenable {
 	rotateY(theta) {
 		this._tmp_quaternion.fromAxisRotation(theta, Vec3.Y_AXIS);
 		this._orientation.multiply(this._tmp_quaternion);
-		this._invalidateModel();
+		this._invalidateLocalModel();
+		this.notify('orientation', this._orientation);
 		return this;
 	}
 
@@ -369,7 +370,8 @@ export default class Object3D extends Listenable {
 	rotateZ(theta) {
 		this._tmp_quaternion.fromAxisRotation(theta, Vec3.Z_AXIS);
 		this._orientation.multiply(this._tmp_quaternion);
-		this._invalidateModel();
+		this._invalidateLocalModel();
+		this.notify('orientation', this._orientation);
 		return this;
 	}
 
@@ -400,20 +402,38 @@ export default class Object3D extends Listenable {
 	}
 
 	/**
+	 * Invalidates this object local model matrix.
+	 * An invalid matrix will be recomputed during the next update.
+	 */
+	_invalidateLocalModel() {
+		this._is_local_model_valid = false;
+		this._invalidateModel();
+	}
+	
+	get isLocalModelValid() {
+		return this._is_local_model_valid;
+	}
+	
+	/**
 	 * Recomputes this object model matrix.
 	 */
 	_revalidateModel() {
-		this._local_model.identity();
-		this._local_model.translate(this._origin);
-		this._local_model.rotateQuat(this._orientation);
-		this._local_model.scaleVec(this._scale);
-
+		let localModelChanged = !this._is_local_model_valid;
+		if (localModelChanged) {
+			this._local_model.identity();
+			this._local_model.translate(this._origin);
+			this._local_model.rotateQuat(this._orientation);
+			this._local_model.scaleVec(this._scale);
+			this._is_local_model_valid = true;
+		}
+		
 		this._computeWorldModel();
 		this._is_model_valid = true;
 
 		for(let child of this._children)
 			child._invalidateModel();
 
+		if (localModelChanged) this.notify('localModel', this._local_model);
 		this.notify('model', this.worldModel);
 	}
 
